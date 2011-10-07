@@ -1,0 +1,30 @@
+CC=i686-pc-mingw32-gcc
+LD=i686-pc-mingw32-gcc
+LIBFILES=
+INCLUDES=
+DEFINES=-DMINGW32
+OPTIMIZATIONS=-Os -fomit-frame-pointer -pipe
+CFLAGS=-Wall $(OPTIMIZATIONS) $(DEFINES) $(INCLUDES)
+LDFLAGS=-Wall -ansi $(LIBFILES)
+SRC_DIR=src
+BUILD_DIR=build_mingw
+EXECUTABLE=$(BUILD_DIR)/lnk_parser.exe
+CODEPAGE=cp866
+
+
+all: $(BUILD_DIR) $(EXECUTABLE)
+
+$(BUILD_DIR):
+	mkdir $(BUILD_DIR)
+
+$(EXECUTABLE): $(BUILD_DIR)/main.o
+	$(LD) -o $@ $^ $(LDFLAGS)
+
+$(BUILD_DIR)/main.o: $(SRC_DIR)/main.c $(SRC_DIR)/main.h
+	cat $(SRC_DIR)/main.h | iconv -t $(CODEPAGE) > $(BUILD_DIR)/main.h
+	cat $(SRC_DIR)/main.c | iconv -t $(CODEPAGE) > $(BUILD_DIR)/main.c
+	$(CC) -o $@ $(BUILD_DIR)/main.c -c $(CFLAGS)
+
+clean:
+	rm -rf $(BUILD_DIR)
+
