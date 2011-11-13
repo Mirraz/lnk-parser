@@ -76,7 +76,7 @@ inline time_t fileTime2UTC (int64_t fileTime) {
 	return (fileTime - (NTFS_TIME_OFFSET)) / 10000000;
 }
 
-void printTimeString (const char *prefix_str, const char* tabs, time_t time, char symbol, uint64_t raw) {
+void printTimeString (const char *prefix_str, const char* tabs, time_t time, const char* symbol, uint64_t raw) {
 	printf("%s:%s", prefix_str, tabs);
 
 	struct tm *pTimeStruct = gmtime(&time);
@@ -86,7 +86,7 @@ void printTimeString (const char *prefix_str, const char* tabs, time_t time, cha
 	printf("%s", str);
 	#undef c_str_size
 
-	printf(" %c = ", symbol);
+	printf(" %s = ", symbol);
 
 	if (printTimeMode == TPM_HEX) {
 		printf(c_016llX_format, c_016llX_args(raw));
@@ -119,7 +119,7 @@ void printTimeString (const char *prefix_str, const char* tabs, time_t time, cha
 #include <iconv.h>
 #endif
 
-void fprintStringCP1251(FILE *fout, const unsigned char *str_bytes, int len) {
+void fprintStringCP1251(FILE *fout, const unsigned char *str_bytes, unsigned int len) {
 	#ifndef MINGW32
 	char *pIn;
 	size_t inLen;
@@ -153,7 +153,7 @@ void fprintStringCP1251(FILE *fout, const unsigned char *str_bytes, int len) {
 	#endif
 }
 
-void fprintStringCP866(FILE *fout, const unsigned char *str_bytes, int len) {
+void fprintStringCP866(FILE *fout, const unsigned char *str_bytes, unsigned int len) {
 	#ifndef MINGW32
 	char *pIn;
 	size_t inLen;
@@ -181,7 +181,7 @@ void fprintStringCP866(FILE *fout, const unsigned char *str_bytes, int len) {
 	#endif
 }
 
-void fprintStringUnicode(FILE *fout, const unsigned char *str_words, int len) {
+void fprintStringUnicode(FILE *fout, const unsigned char *str_words, unsigned int len) {
 	#ifndef MINGW32
 	char *pIn;
 	size_t inLen;
@@ -298,18 +298,17 @@ bool printParseObjectID (const unsigned char uuidBytes[]) {
 	ObjIDParsed parsed;
 	if (parseObjectID(uuidBytes, &parsed)) return true;
 
-	printf("\t");
-	printTimeString ("Время", " ", fileTime2UTC(parsed.time), 'T', parsed.time);
+	printTimeString ("Время создания идентификатора", "       ", fileTime2UTC(parsed.time), "T", parsed.time);
 	/*printf ("\tВремя: ");
 	printFileTime(parsed.time);
 	printf("  T = " c_016llX_format "\n", c_016llX_args(parsed.time));*/
 
-	printf("\tПорядковый номер часов: %u\n", parsed.seq);
+	printf("Порядковый номер отсчета: %u\n", parsed.seq);
 
-	printf ("\tMAC-адрес: ");
+	printf ("MAC-адрес: ");
 	int i;
 	for (i=0; i<6; ++i) printf("%02X", parsed.mac[i]);
-	printf("\n");
+	putchar('\n');
 
 	return false;
 }
@@ -413,18 +412,6 @@ bool readAndParseFile(const char* fileNameIn) {
 	// TODO: check LinkCLSID
 	// TODO: parse FileAttributes
 	printField (ShellLinkHeader, FileSize);
-
-	/*#define printTime(time, tabs, sym) { \
-		printf("%s:"tabs, ShellLinkHeader_strname.time); \
-		printFileTime(ShellLinkHeader.time); \
-		printf("  " sym " = " c_016llX_format "\n", c_016llX_args(ShellLinkHeader.time)); \
-	}*/
-	#define printTime(time, tabs, sym) \
-		printTimeString (ShellLinkHeader_strname.time, tabs, fileTime2UTC(ShellLinkHeader.time), sym, ShellLinkHeader.time);
-
-	printTime(CreationTime, "\t   ", 'C');
-	printTime(AccessTime, "  ", 'A');
-	printTime(WriteTime, " ", 'M');
 
 	dword flags = ShellLinkHeader.LinkFlags;
 	if (flags & LF_HasLinkTargetIDList) {
@@ -598,6 +585,18 @@ bool readAndParseFile(const char* fileNameIn) {
 	readStringData (LF_HasWorkingDir, WorkingDir);
 	readStringData (LF_HasArguments, CommandLineArguments);
 	readStringData (LF_HasIconLocation, IconLocation);
+	
+	putchar('\n');
+	/*#define printTime(time, tabs, sym) { \
+		printf("%s:"tabs, ShellLinkHeader_strname.time); \
+		printFileTime(ShellLinkHeader.time); \
+		printf("  " sym " = " c_016llX_format "\n", c_016llX_args(ShellLinkHeader.time)); \
+	}*/
+	#define printTime(time, tabs, sym) \
+		printTimeString (ShellLinkHeader_strname.time, tabs, fileTime2UTC(ShellLinkHeader.time), sym, ShellLinkHeader.time);
+	printTime(CreationTime, "       ", "C");
+	printTime(AccessTime, "    ", "A");
+	printTime(WriteTime, "   ", "M");
 
 	// ###### ExtraData
 {
@@ -622,20 +621,24 @@ bool readAndParseFile(const char* fileNameIn) {
 			printf("%s: %08X\n", DLTDataBlock_strname.DLTDataVersion, DLTDataBlock.DLTDataVersion);
 			printf("%s: ", DLTDataBlock_strname.MachineIDStr);
 			fprintStringCP866(stdout, (byte *)(DLTDataBlock.MachineIDStr), 15);
-			printf("\n");
+			putchar('\n');
 			int i;
 			#define DLT_GUID_print(GUID_name, tabs) { \
 				printf("%s:"tabs, DLTDataBlock_strname.GUID_name); \
 				for (i=0; i<16; ++i) printf("%02X", DLTDataBlock.GUID_name[i]); \
-				printf("\n"); \
+				putchar('\n'); \
 			}
 			const char mes_unsuppGUID[] = "Неподдерживаемый формат GUID\n";
 			DLT_GUID_print(VolumeID, "\t\t\t");
 			DLT_GUID_print(FileID, "\t\t\t");
+			putchar('\n');
 			if (printParseObjectID(DLTDataBlock.FileID)) logError(mes_unsuppGUID);
+			putchar('\n');
 			DLT_GUID_print(BirthVolumeID, "\t\t");
 			DLT_GUID_print(BirthFileID, "\t");
+			putchar('\n');
 			if (printParseObjectID(DLTDataBlock.BirthFileID)) logError(mes_unsuppGUID);
+			putchar('\n');
 		break;
 		default:
 			mallocAndReadData(data, data_size);
@@ -689,9 +692,9 @@ bool getAndPrintFileTime(const char *fileName) {
 		printTimeString (name, tabs, value.tv_sec, sym, time); \
 	}
 
-	printTimeSingle("Время последнего доступа к файлу", "  ", 'A', statStruct.st_atim);
-	printTimeSingle("Время последней модификации файла", " ", 'M', statStruct.st_mtim);
-	printTimeSingle("Время последнего изменения файла", "  ", 'C', statStruct.st_ctim);
+	printTimeSingle("Время последнего доступа к файлу", "   ", "AL", statStruct.st_atim);
+	printTimeSingle("Время последней модификации файла", "  ", "ML", statStruct.st_mtim);
+	printTimeSingle("Время последнего изменения файла", "   ", "CL", statStruct.st_ctim);
 
 	//#undef c_str_size
 
@@ -724,9 +727,9 @@ bool getAndPrintFileTime(const char *fileName) {
 		time = ftime.dwLowDateTime | (((int64_t)ftime.dwHighDateTime) << 32); \
 		printTimeString (name, tabs, fileTime2UTC(time), sym, time); \
 	}
-	printTimeSingle("Время создания файла", "              ", 'C', CreationTime);
-	printTimeSingle("Время последнего доступа к файлу", "  ", 'A', LastAccessTime);
-	printTimeSingle("Время последней модификации файла", " ", 'M', LastWriteTime);
+	printTimeSingle("Время создания файла", "               ", "CL", CreationTime);
+	printTimeSingle("Время последнего доступа к файлу", "   ", "AL", LastAccessTime);
+	printTimeSingle("Время последней модификации файла", "  ", "ML", LastWriteTime);
 	rez = false;
 
 close:
@@ -739,7 +742,7 @@ close:
 
 #define isPStorageNotNULL(pStorage) (pStorage != NULL && *pStorage == NULL)
 
-bool commandLine (int argc, char **argv, char **pFileNameIn) {
+bool commandLine (int argc, char *const *argv, const char **pFileNameIn) {
 	assert (isPStorageNotNULL (pFileNameIn));
 
 	printTimeMode = TPM_HEX;
@@ -793,16 +796,16 @@ bool commandLine (int argc, char **argv, char **pFileNameIn) {
 }
 
 
-int main (int argc, char **argv) {
+int main (int argc, char *const *argv) {
 
 	bool rez;
-	char *fileNameIn = NULL;
+	const char *fileNameIn = NULL;
 
 	if (commandLine (argc, argv, &fileNameIn)) {rez = true; goto err;}
 
 	printf("Имя файла ярлыка: ");
 	#ifdef MINGW32
-	fprintStringCP1251(stdout, fileNameIn, strlen(fileNameIn));
+	fprintStringCP1251(stdout, (const unsigned char *)fileNameIn, strlen(fileNameIn));
 	#else
 	printf("%s", fileNameIn);
 	#endif
